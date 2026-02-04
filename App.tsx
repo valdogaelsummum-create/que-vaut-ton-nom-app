@@ -91,6 +91,16 @@ const App: React.FC = () => {
               <button onClick={() => handleStart(true)} className="px-[6vh] py-[3vh] border-4 border-black text-black text-[3vh] font-bold rounded-full active:scale-95 transition-all">NOUVELLE SESSION</button>
             </div>
             <p className="mt-8 text-neutral-400 font-bold italic uppercase tracking-widest animate-pulse">Offrez des cadeaux pour valoriser votre nom 💎</p>
+            
+            {/* LIENS JURIDIQUES SUR LA PAGE D'ACCUEIL */}
+            <footer className="absolute bottom-10 left-0 right-0 flex justify-center gap-10 opacity-50 hover:opacity-100 transition-opacity">
+              <a href="./privacy.html" target="_blank" className="text-[1.2vh] font-black italic border-b-2 border-black hover:text-amber-600 hover:border-amber-600 transition-colors">
+                Politique de Confidentialité
+              </a>
+              <a href="./terms.html" target="_blank" className="text-[1.2vh] font-black italic border-b-2 border-black hover:text-amber-600 hover:border-amber-600 transition-colors">
+                Conditions d'Utilisation
+              </a>
+            </footer>
         </div>
       )}
 

@@ -13,7 +13,6 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [lastGift, setLastGift] = useState<GiftEvent | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
-  const [isSimulatorMode, setSimulatorMode] = useState(false);
   
   const welcomedUsersRef = useRef<Set<string>>(new Set());
 
@@ -45,7 +44,8 @@ const App: React.FC = () => {
 
   const handleStart = (resetLive: boolean = false) => {
     if (resetLive) {
-      setUsers(storageService.resetLivePoints());
+      localStorage.clear();
+      setUsers([]);
       welcomedUsersRef.current = new Set();
     }
     audioEngine.init();
@@ -60,10 +60,8 @@ const App: React.FC = () => {
       setLastGift({ username: event.username, giftName: event.giftName, coins: event.coins });
       audioEngine.announce(`Estimation en hausse ! Le nom de ${event.username} vaut maintenant ${event.coins} euros !`, 'female', true);
     } else if (event.type === 'comment') {
-      const countryId = findClosestCountryId(event.comment);
-      if (countryId) {
-        setUsers(storageService.setCountry(event.username, countryId));
-      }
+      const updated = storageService.setCountry(event.username, event.comment);
+      setUsers(updated);
     } else if (event.type === 'join') {
       if (!welcomedUsersRef.current.has(event.username)) {
         welcomedUsersRef.current.add(event.username);
@@ -141,7 +139,6 @@ const App: React.FC = () => {
 
       {/* BAS DE L'ÉCRAN : ORIGINES ET HISTORIQUE */}
       <div className="h-[40vh] flex bg-white">
-        {/* PAYS DES PARTICIPANTS */}
         <div className="w-1/2 border-r-[0.5vh] border-black flex flex-col">
           <div className="h-[4vh] bg-amber-500 text-black flex items-center justify-center font-bold italic tracking-tighter border-b-[0.3vh] border-black">
             🌍 ORIGINE DES NOMS LES PLUS FORTS
@@ -151,7 +148,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* RECORDS */}
         <div className="w-1/2 flex flex-col">
           <div className="h-[20vh] border-b-[0.4vh] border-black flex flex-col">
             <div className="h-[4vh] bg-blue-700 text-white text-[1.6vh] flex items-center px-4 italic justify-center uppercase">
@@ -180,8 +176,7 @@ const App: React.FC = () => {
       <Simulator 
         onEvent={handleEvent} 
         onReset={() => handleStart(true)} 
-        isSimulatorMode={isSimulatorMode} 
-        setSimulatorMode={setSimulatorMode}
+        users={users}
       />
     </div>
   );

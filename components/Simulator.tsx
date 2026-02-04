@@ -22,7 +22,6 @@ const Simulator: React.FC<Props> = ({ onEvent, onReset }) => {
 
   return (
     <>
-      {/* Barre de status discrète en bas - Priorité haute pour être au dessus de l'écran start */}
       <div className="fixed bottom-0 left-0 right-0 h-[3vh] bg-black border-t border-white/10 flex items-center px-4 gap-6 z-[600] text-[1vh] font-bold">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
@@ -40,7 +39,6 @@ const Simulator: React.FC<Props> = ({ onEvent, onReset }) => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1500] flex items-center justify-center p-10">
           <div className="bg-neutral-950 text-white w-full max-w-5xl border-4 border-white flex flex-col font-black uppercase italic shadow-[20px_20px_0_rgba(0,0,0,0.5)]">
             
-            {/* Header du Modal */}
             <div className="flex justify-between items-center p-6 border-b-4 border-white bg-neutral-900">
               <h2 className="text-4xl tracking-tighter">COCKPIT DE RÉGIE</h2>
               <button 
@@ -68,10 +66,14 @@ const Simulator: React.FC<Props> = ({ onEvent, onReset }) => {
                 <div className="p-6 border-2 border-white/10 bg-neutral-900/50">
                   <h3 className="text-2xl mb-4 text-neutral-400">2. SIMULATEUR DE TESTS</h3>
                   <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => onEvent({type: 'gift', username: 'Testeur_Fou', giftName: 'Rose', coins: 10})} className="border border-white/20 p-3 hover:bg-white hover:text-black text-xs">CADEAU +10€</button>
-                    <button onClick={() => onEvent({type: 'gift', username: 'Gros_Donneur', giftName: 'Lion', coins: 500})} className="border border-white/20 p-3 hover:bg-yellow-500 hover:text-black text-xs">CADEAU +500€</button>
-                    <button onClick={() => onEvent({type: 'comment', username: 'User1', comment: 'Maroc'})} className="border border-white/20 p-3 hover:bg-white hover:text-black text-xs">PAYS: MAROC</button>
-                    <button onClick={() => onEvent({type: 'comment', username: 'User2', comment: 'France'})} className="border border-white/20 p-3 hover:bg-white hover:text-black text-xs">PAYS: FRANCE</button>
+                    {/* Boutons mis à jour pour utiliser les mêmes noms d'utilisateurs */}
+                    <button onClick={() => onEvent({type: 'gift', username: 'Testeur_Fou', giftName: 'Rose', coins: 10})} className="border border-white/20 p-3 hover:bg-white hover:text-black text-xs">TESTEUR: CADEAU +10€</button>
+                    <button onClick={() => onEvent({type: 'gift', username: 'Gros_Donneur', giftName: 'Lion', coins: 500})} className="border border-white/20 p-3 hover:bg-yellow-500 hover:text-black text-xs">DONNEUR: CADEAU +500€</button>
+                    <button onClick={() => onEvent({type: 'comment', username: 'Testeur_Fou', comment: 'Maroc'})} className="border border-white/20 p-3 hover:bg-white hover:text-black text-xs">TESTEUR: PAYS MAROC</button>
+                    <button onClick={() => onEvent({type: 'comment', username: 'Gros_Donneur', comment: 'France'})} className="border border-white/20 p-3 hover:bg-white hover:text-black text-xs">DONNEUR: PAYS FRANCE</button>
+                  </div>
+                  <div className="mt-4 p-3 bg-red-900/20 border border-red-500/50 text-[10px] text-red-200 uppercase font-bold italic">
+                    ⚠ RÈGLE : Le pays ne sera enregistré QUE si l'utilisateur a déjà envoyé un cadeau.
                   </div>
                 </div>
               </div>
@@ -84,7 +86,7 @@ const Simulator: React.FC<Props> = ({ onEvent, onReset }) => {
                 <div className="font-mono text-[1.1vh] normal-case flex-1 h-[30vh] overflow-y-auto space-y-1 bg-black p-4 border border-white/10 rounded">
                   <p className="text-neutral-500">[{new Date().toLocaleTimeString()}] Système prêt.</p>
                   {connectionStatus === 'connected' && (
-                    <p className="text-green-400">[{new Date().toLocaleTimeString()}] EVENT: Connexion établie avec le serveur de production.</p>
+                    <p className="text-green-400">[{new Date().toLocaleTimeString()}] EVENT: Connexion établie.</p>
                   )}
                 </div>
                 <button 

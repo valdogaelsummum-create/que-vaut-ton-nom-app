@@ -1,0 +1,8 @@
+{
+  "name": "TikTok Live Dynamic Leaderboard",
+  "description": "A high-fidelity interactive leaderboard for TikTok Live, featuring real-time gift tracking, persistent rankings for users and countries, and Gemini-powered voice announcements.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}

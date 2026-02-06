@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, GiftEvent, LiveEvent, CountryRanking } from './types';
-import { getCountryInfo } from './constants';
 import { audioEngine } from './services/AudioEngine';
 import { storageService } from './services/storageService';
 import LeaderboardItem from './components/LeaderboardItem';
@@ -24,36 +23,33 @@ const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [logs, setLogs] = useState<WebhookLog[]>([]);
   
-  // Persistence des réglages portail
-  const [clientId, setClientId] = useState(localStorage.getItem('tiktok_client_id') || '');
-  const [customBaseUrl, setCustomBaseUrl] = useState(localStorage.getItem('tiktok_base_url') || window.location.origin + window.location.pathname);
+  const [clientId, setClientId] = useState(() => localStorage.getItem('tiktok_client_id') || '');
+  const [customBaseUrl, setCustomBaseUrl] = useState(() => {
+    return localStorage.getItem('tiktok_base_url') || (typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '');
+  });
   
   const [activeTab, setActiveTab] = useState<'setup' | 'credentials'>('setup');
   
-  const welcomedUsersRef = useRef<Set<string>>(new Set());
-
   useEffect(() => {
     const loadedUsers = storageService.getUsers();
     setUsers(loadedUsers);
   }, []);
 
-  // Nettoyage de l'URL (enlever index.html à la fin si présent et assurer le slash final)
   const sanitizedBaseUrl = useMemo(() => {
+    if (!customBaseUrl) return '';
     let url = customBaseUrl.split('index.html')[0];
     if (!url.endsWith('/')) url += '/';
     return url;
   }, [customBaseUrl]);
 
   useEffect(() => {
-    localStorage.setItem('tiktok_base_url', customBaseUrl);
+    if (customBaseUrl) localStorage.setItem('tiktok_base_url', customBaseUrl);
   }, [customBaseUrl]);
 
   const rankings = useMemo(() => {
     const sorted = [...users].filter(u => u.pointsLive > 0).sort((a, b) => b.pointsLive - a.pointsLive);
     return {
       topLive: sorted.slice(0, 15),
-      topWeek: [...users].filter(u => u.pointsWeek > 0).sort((a, b) => b.pointsWeek - a.pointsWeek).slice(0, 5),
-      topYear: [...users].filter(u => u.pointsYear > 0).sort((a, b) => b.pointsYear - a.pointsYear).slice(0, 5),
     };
   }, [users]);
 
@@ -93,12 +89,12 @@ const App: React.FC = () => {
     setTimeout(() => {
       setIsConnecting(false);
       handleStart();
-    }, 1500);
+    }, 1000);
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("Copié dans le presse-papier !");
+    alert("Lien copié !");
   };
 
   const handleEvent = (event: LiveEvent) => {
@@ -126,108 +122,78 @@ const App: React.FC = () => {
 
   if (!hasStarted) {
     return (
-      <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-white font-sans overflow-y-auto">
-        <div className="w-full max-w-2xl bg-[#161616] border border-white/10 rounded-3xl p-8 shadow-2xl space-y-8">
+      <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center p-4 text-white font-sans overflow-y-auto">
+        <div className="w-full max-w-2xl bg-[#161616] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
           
-          <div className="flex items-center justify-between border-b border-white/5 pb-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between border-b border-white/5 pb-6 gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#fe2c55] rounded-xl flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(254,44,85,0.3)]">🔗</div>
+              <div className="w-12 h-12 bg-[#fe2c55] rounded-xl flex items-center justify-center text-2xl shadow-lg">🔗</div>
               <div>
                 <h1 className="text-xl font-black uppercase tracking-tight">TikTok Portal Sync</h1>
-                <p className="text-neutral-500 text-[10px] font-mono">APP STATUS: DEVELOPMENT / READY FOR REVIEW</p>
+                <p className="text-neutral-500 text-[10px] font-mono">READY FOR DEPLOYMENT</p>
               </div>
             </div>
             <div className="flex bg-black p-1 rounded-lg">
                 <button onClick={() => setActiveTab('setup')} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'setup' ? 'bg-[#fe2c55] text-white' : 'text-neutral-500'}`}>1. Portal URLs</button>
-                <button onClick={() => setActiveTab('credentials')} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'credentials' ? 'bg-[#fe2c55] text-white' : 'text-neutral-500'}`}>2. Start App</button>
+                <button onClick={() => setActiveTab('credentials')} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'credentials' ? 'bg-[#fe2c55] text-white' : 'text-neutral-500'}`}>2. Launch</button>
             </div>
           </div>
 
           {activeTab === 'setup' ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="space-y-6">
               <div className="bg-amber-500/10 border-l-4 border-amber-500 p-4 rounded-r-xl">
-                 <p className="text-xs text-amber-200 leading-relaxed font-medium">
-                   <strong>IMPORTANT :</strong> Entrez l'URL de votre site GitHub ci-dessous (celle que vous voyez dans votre navigateur) pour que tous les liens ci-dessous se mettent à jour.
+                 <p className="text-xs text-amber-200 font-medium">
+                   <strong>ACTION REQUISE :</strong> Copiez votre URL de navigateur ci-dessous pour générer vos liens TikTok.
                  </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">Votre URL GitHub Pages</label>
+                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">URL actuelle du site</label>
                 <input 
                   type="text" 
-                  placeholder="https://votre-pseudo.github.io/votre-projet/" 
                   value={customBaseUrl}
                   onChange={(e) => setCustomBaseUrl(e.target.value)}
                   className="w-full bg-black border border-white/10 p-4 rounded-xl font-mono text-sm focus:border-amber-500 outline-none text-white"
                 />
               </div>
 
-              <div className="space-y-4 border-t border-white/5 pt-6">
-                <div className="group">
-                  <label className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-1 block">Login Kit: Redirect URI</label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-black/40 border border-white/5 p-3 rounded-lg font-mono text-[11px] text-[#fe2c55] truncate">{sanitizedBaseUrl}</div>
-                    <button onClick={() => copyToClipboard(sanitizedBaseUrl)} className="bg-white/5 hover:bg-white/10 px-4 rounded-lg text-[10px] font-bold">COPY</button>
+              <div className="grid gap-4 pt-4 border-t border-white/5">
+                {[
+                  { label: "Login Kit: Redirect URI", value: sanitizedBaseUrl },
+                  { label: "Login Kit: Privacy Policy", value: sanitizedBaseUrl + 'privacy.html' },
+                  { label: "Login Kit: Terms", value: sanitizedBaseUrl + 'terms.html' },
+                  { label: "Webhooks: Callback URL", value: sanitizedBaseUrl + 'api/webhook', highlight: true }
+                ].map((item, i) => (
+                  <div key={i} className="group">
+                    <label className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-1 block">{item.label}</label>
+                    <div className="flex gap-2">
+                      <div className={`flex-1 bg-black/40 border ${item.highlight ? 'border-[#fe2c55]/30' : 'border-white/5'} p-3 rounded-lg font-mono text-[10px] truncate ${item.highlight ? 'text-[#fe2c55]' : 'text-neutral-400'}`}>{item.value}</div>
+                      <button onClick={() => copyToClipboard(item.value)} className="bg-white/5 hover:bg-white/10 px-4 rounded-lg text-[10px] font-bold transition-colors">COPY</button>
+                    </div>
                   </div>
-                </div>
-
-                <div className="group">
-                  <label className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-1 block">Login Kit: Privacy Policy URL</label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-black/40 border border-white/5 p-3 rounded-lg font-mono text-[11px] text-neutral-400 truncate">{sanitizedBaseUrl}privacy.html</div>
-                    <button onClick={() => copyToClipboard(sanitizedBaseUrl + 'privacy.html')} className="bg-white/5 hover:bg-white/10 px-4 rounded-lg text-[10px] font-bold">COPY</button>
-                  </div>
-                </div>
-
-                <div className="group">
-                  <label className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-1 block">Login Kit: Terms of Service URL</label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-black/40 border border-white/5 p-3 rounded-lg font-mono text-[11px] text-neutral-400 truncate">{sanitizedBaseUrl}terms.html</div>
-                    <button onClick={() => copyToClipboard(sanitizedBaseUrl + 'terms.html')} className="bg-white/5 hover:bg-white/10 px-4 rounded-lg text-[10px] font-bold">COPY</button>
-                  </div>
-                </div>
-
-                <div className="group border-t border-white/5 pt-4 mt-4">
-                  <label className="text-[10px] text-[#fe2c55] font-black uppercase tracking-widest mb-1 block">Webhooks: Callback URL</label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-black/40 border border-[#fe2c55]/20 p-3 rounded-lg font-mono text-[11px] text-[#fe2c55] truncate">{sanitizedBaseUrl}api/webhook</div>
-                    <button onClick={() => copyToClipboard(sanitizedBaseUrl + 'api/webhook')} className="bg-[#fe2c55]/10 hover:bg-[#fe2c55]/20 text-[#fe2c55] px-4 rounded-lg text-[10px] font-bold border border-[#fe2c55]/20">COPY</button>
-                  </div>
-                </div>
+                ))}
               </div>
-
-              <div className="pt-4">
-                <button onClick={() => setActiveTab('credentials')} className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Suivant : Configurer l'API</button>
-              </div>
+              <button onClick={() => setActiveTab('credentials')} className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Suivant : Configuration API →</button>
             </div>
           ) : (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+            <div className="space-y-6">
                <div className="space-y-2">
-                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">Client Key (From TikTok Portal)</label>
+                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">Client Key (TikTok Portal)</label>
                 <input 
                   type="text" 
-                  placeholder="Paste your Client Key here..." 
+                  placeholder="Paste your Client Key..." 
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                  className="w-full bg-black border border-white/10 p-4 rounded-xl font-mono text-sm focus:border-[#fe2c55] outline-none text-white placeholder:text-neutral-700"
+                  className="w-full bg-black border border-white/10 p-4 rounded-xl font-mono text-sm focus:border-[#fe2c55] outline-none text-white"
                 />
               </div>
 
               <div className="bg-neutral-900/50 p-6 rounded-2xl border border-white/5 space-y-4">
-                <h3 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Permissions Demandées (Scopes)</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-black/50 p-2 rounded border border-white/5 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#fe2c55]"></div>
-                    <span className="text-[9px] font-mono text-neutral-400">user.info.basic</span>
-                  </div>
-                  <div className="bg-black/50 p-2 rounded border border-white/5 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#fe2c55]"></div>
-                    <span className="text-[9px] font-mono text-neutral-400">live.interaction.gift</span>
-                  </div>
-                  <div className="bg-black/50 p-2 rounded border border-white/5 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-600"></div>
-                    <span className="text-[9px] font-mono text-neutral-400">live.interaction.comment</span>
-                  </div>
+                <h3 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Scopes Requis</h3>
+                <div className="flex flex-wrap gap-2">
+                  {['user.info.basic', 'live.interaction.gift', 'live.interaction.comment'].map(s => (
+                    <span key={s} className="bg-black/50 px-2 py-1 rounded border border-white/5 text-[9px] font-mono text-neutral-400">{s}</span>
+                  ))}
                 </div>
               </div>
 
@@ -235,20 +201,14 @@ const App: React.FC = () => {
                 <button 
                   onClick={handleTikTokAuth}
                   disabled={isConnecting}
-                  className="w-full py-5 bg-[#fe2c55] text-white rounded-2xl font-black text-lg hover:brightness-110 transition-all active:scale-[0.98] shadow-[0_10px_30px_rgba(254,44,85,0.2)]"
+                  className="w-full py-5 bg-[#fe2c55] text-white rounded-2xl font-black text-lg hover:brightness-110 transition-all active:scale-[0.98] shadow-lg disabled:opacity-50"
                 >
-                  {isConnecting ? 'CONNECTING TO TIKTOK...' : 'LAUNCH LIVE CONSOLE'}
+                  {isConnecting ? 'CHARGEMENT...' : 'LANCER LE LIVE DASHBOARD'}
                 </button>
-                <button onClick={() => setActiveTab('setup')} className="w-full py-3 text-neutral-500 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-all">← Back to Portal Sync</button>
+                <button onClick={() => setActiveTab('setup')} className="w-full py-2 text-neutral-500 text-[10px] font-bold uppercase tracking-widest hover:text-white">← Retour aux URLs</button>
               </div>
             </div>
           )}
-
-          <div className="text-center">
-             <p className="text-[9px] text-neutral-600 uppercase tracking-[0.2em] font-medium italic">
-                Secure Environment - Data Persistence via LocalStorage
-             </p>
-          </div>
         </div>
       </div>
     );
@@ -256,8 +216,6 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-white overflow-hidden text-black font-black uppercase border-[0.5vh] border-black relative">
-      
-      {/* HEADER BAR */}
       <header className="h-[8vh] flex items-center justify-between border-b-[0.5vh] border-black px-8 bg-white">
         <div className="flex items-center gap-4">
           <div className="bg-black text-white p-1 px-3 skew-x-[-10deg]">
@@ -265,21 +223,20 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full border border-green-200">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-[10px] text-green-700 font-mono tracking-widest">WEBHOOKS: ACTIVE</span>
+            <span className="text-[10px] text-green-700 font-mono tracking-widest">LIVE SYNC ACTIVE</span>
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[0.8vh] text-neutral-400 font-mono">CLIENT_ID: {clientId.substring(0,8)}...</span>
+          <span className="text-[0.8vh] text-neutral-400 font-mono">ID: {clientId.substring(0,8)}...</span>
           <span className="text-[1.8vh] italic">VALEUR EN TEMPS RÉEL</span>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* LEFT: LEADERBOARD */}
         <div className="flex-1 flex flex-col border-r-[0.5vh] border-black">
           <div className="h-[4vh] bg-neutral-900 text-white flex items-center px-4 justify-between">
-            <span className="text-[1.2vh] italic tracking-widest">LIVE QUOTATION (V2.4)</span>
-            <span className="text-[1vh] font-mono">STATUS: 200 OK</span>
+            <span className="text-[1.2vh] italic tracking-widest">LIVE QUOTATION</span>
+            <span className="text-[1vh] font-mono">200 OK</span>
           </div>
           <div className="flex-1 grid grid-cols-3">
             {starsColumns.map((col, idx) => (
@@ -299,32 +256,27 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT: STATS & LOGS */}
         <div className="w-[30vw] flex flex-col bg-neutral-50">
-          {/* GEOGRAPHY */}
           <div className="h-[40%] flex flex-col border-b-[0.5vh] border-black">
-            <div className="h-[4vh] bg-amber-400 flex items-center justify-center font-bold border-b-2 border-black italic">🌍 GEOGRAPHIC ANALYTICS</div>
+            <div className="h-[4vh] bg-amber-400 flex items-center justify-center font-bold border-b-2 border-black italic">🌍 ANALYTICS PAYS</div>
             <div className="flex-1 overflow-hidden">
               <CountryRankingList rankings={countryRankings} count={8} />
             </div>
           </div>
-
-          {/* WEBHOOK LOGS (TERMINAL) */}
           <div className="flex-1 flex flex-col bg-black text-green-400 p-4 font-mono overflow-hidden">
             <div className="text-[10px] text-neutral-500 mb-2 flex justify-between uppercase border-b border-white/10 pb-1">
-              <span>Webhook Terminal Log</span>
-              <span>Listening...</span>
+              <span>Terminal Log</span>
+              <span>Online</span>
             </div>
             <div className="flex-1 overflow-y-auto text-[10px] space-y-1">
               {logs.map(log => (
                 <div key={log.id} className="flex gap-2">
                   <span className="text-neutral-600">[{log.time}]</span>
                   <span className="text-blue-400">{log.type}</span>
-                  <span className="text-neutral-400 truncate flex-1">{log.payload}</span>
                   <span className="text-green-500">[{log.status}]</span>
                 </div>
               ))}
-              {logs.length === 0 && <div className="text-neutral-700">Waiting for incoming TikTok payloads...</div>}
+              {logs.length === 0 && <div className="text-neutral-700">Waiting for Webhooks...</div>}
             </div>
           </div>
         </div>
@@ -337,3 +289,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

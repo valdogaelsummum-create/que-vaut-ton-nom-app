@@ -94,15 +94,25 @@ export const storageService = {
 
   setCountry: (userId: string, countryCode: string): User[] => {
     const users = storageService.getUsers();
+    // CONDITION STRICTE : On cherche l'utilisateur. 
+    // S'il n'existe pas dans la base (index === -1), on ne fait RIEN.
     const index = users.findIndex(u => u.id === userId || u.username === userId);
-    if (index > -1) {
-      const updated = [...users];
-      updated[index].countryCode = countryCode;
-      updated[index].country = countryCode;
-      storageService.saveUsers(updated);
-      return updated;
+    
+    if (index === -1) {
+      console.log(`Attribution pays refusée : l'utilisateur ${userId} n'a pas encore de points.`);
+      return users; 
     }
-    return users;
+
+    const updated = [...users];
+    updated[index] = {
+      ...updated[index],
+      countryCode: countryCode,
+      country: countryCode,
+      lastUpdate: Date.now()
+    };
+    
+    storageService.saveUsers(updated);
+    return updated;
   },
 
   resetLivePoints: (): User[] => {

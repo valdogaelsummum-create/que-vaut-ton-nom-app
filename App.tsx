@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User, GiftEvent, LiveEvent, CountryRanking } from './types';
 import { audioEngine } from './services/AudioEngine';
 import { storageService } from './services/storageService';
+import { COUNTRIES } from './constants';
 import LeaderboardItem from './components/LeaderboardItem';
 import CountryRankingList from './components/CountryRanking';
 import GiftOverlay from './components/GiftOverlay';
@@ -23,34 +24,50 @@ const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [logs, setLogs] = useState<WebhookLog[]>([]);
   
+  // Persistence et détection intelligente de l'URL de base pour GitHub Pages
   const [clientId, setClientId] = useState(() => localStorage.getItem('tiktok_client_id') || '');
+  
   const [customBaseUrl, setCustomBaseUrl] = useState(() => {
-    return localStorage.getItem('tiktok_base_url') || (typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '');
+    const saved = localStorage.getItem('tiktok_base_url');
+    if (saved) return saved;
+    // Détection auto de l'URL GitHub Pages
+    if (typeof window !== 'undefined') {
+      let url = window.location.origin + window.location.pathname;
+      if (url.endsWith('index.html')) url = url.replace('index.html', '');
+      if (!url.endsWith('/')) url += '/';
+      return url;
+    }
+    return '';
   });
   
   const [activeTab, setActiveTab] = useState<'setup' | 'credentials'>('setup');
   
   useEffect(() => {
-    const loadedUsers = storageService.getUsers();
-    setUsers(loadedUsers);
+    try {
+      const loadedUsers = storageService.getUsers();
+      setUsers(loadedUsers);
+    } catch (e) {
+      console.error("Erreur chargement utilisateurs:", e);
+    }
   }, []);
 
   const sanitizedBaseUrl = useMemo(() => {
     if (!customBaseUrl) return '';
-    let url = customBaseUrl.split('index.html')[0];
+    let url = customBaseUrl.trim();
+    if (url.endsWith('index.html')) url = url.replace('index.html', '');
     if (!url.endsWith('/')) url += '/';
     return url;
   }, [customBaseUrl]);
 
   useEffect(() => {
-    if (customBaseUrl) localStorage.setItem('tiktok_base_url', customBaseUrl);
-  }, [customBaseUrl]);
+    if (sanitizedBaseUrl) {
+      localStorage.setItem('tiktok_base_url', sanitizedBaseUrl);
+    }
+  }, [sanitizedBaseUrl]);
 
   const rankings = useMemo(() => {
     const sorted = [...users].filter(u => u.pointsLive > 0).sort((a, b) => b.pointsLive - a.pointsLive);
-    return {
-      topLive: sorted.slice(0, 15),
-    };
+    return { topLive: sorted.slice(0, 15) };
   }, [users]);
 
   const countryRankings = useMemo<CountryRanking[]>(() => {
@@ -79,7 +96,7 @@ const App: React.FC = () => {
   const handleStart = () => {
     audioEngine.init();
     setHasStarted(true);
-    addLog('SYSTEM_INIT', { message: 'Webhook Listener Started', client_id: clientId });
+    addLog('SYSTEM_INIT', { message: 'Dashboard Ready', client_id: clientId });
   };
 
   const handleTikTokAuth = () => {
@@ -89,12 +106,16 @@ const App: React.FC = () => {
     setTimeout(() => {
       setIsConnecting(false);
       handleStart();
-    }, 1000);
+    }, 800);
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    alert("Lien copié !");
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Copié avec succès !");
+    }).catch(err => {
+      console.error('Erreur copie:', err);
+      alert("Erreur lors de la copie");
+    });
   };
 
   const handleEvent = (event: LiveEvent) => {
@@ -102,12 +123,12 @@ const App: React.FC = () => {
       const updated = storageService.updateUser(event.username, event.username, event.coins);
       setUsers(updated);
       setLastGift({ username: event.username, giftName: event.giftName, coins: event.coins });
-      addLog('live_interaction.gift', { user: event.username, value: event.coins, gift: event.giftName });
-      audioEngine.announce(`Donation reçue de ${event.username}. Estimation de la valeur de son nom en hausse.`, 'female', true);
+      addLog('gift_received', { user: event.username, coins: event.coins });
+      audioEngine.announce(`Félicitations à ${event.username} pour son don.`, 'female', true);
     } else if (event.type === 'comment') {
       const updated = storageService.setCountry(event.username, event.comment);
       setUsers(updated);
-      addLog('live_interaction.comment', { user: event.username, geo_data: event.comment });
+      addLog('country_set', { user: event.username, country: event.comment });
     }
   };
 
@@ -120,40 +141,41 @@ const App: React.FC = () => {
     return cols;
   }, [rankings.topLive]);
 
+  // ÉCRAN DE CONFIGURATION (SETUP)
   if (!hasStarted) {
     return (
       <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center p-4 text-white font-sans overflow-y-auto">
         <div className="w-full max-w-2xl bg-[#161616] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-          
           <div className="flex flex-col sm:flex-row items-center justify-between border-b border-white/5 pb-6 gap-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-[#fe2c55] rounded-xl flex items-center justify-center text-2xl shadow-lg">🔗</div>
               <div>
                 <h1 className="text-xl font-black uppercase tracking-tight">TikTok Portal Sync</h1>
-                <p className="text-neutral-500 text-[10px] font-mono">READY FOR DEPLOYMENT</p>
+                <p className="text-neutral-500 text-[10px] font-mono">GH-PAGES COMPATIBLE</p>
               </div>
             </div>
             <div className="flex bg-black p-1 rounded-lg">
-                <button onClick={() => setActiveTab('setup')} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'setup' ? 'bg-[#fe2c55] text-white' : 'text-neutral-500'}`}>1. Portal URLs</button>
-                <button onClick={() => setActiveTab('credentials')} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'credentials' ? 'bg-[#fe2c55] text-white' : 'text-neutral-500'}`}>2. Launch</button>
+                <button onClick={() => setActiveTab('setup')} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'setup' ? 'bg-[#fe2c55] text-white' : 'text-neutral-500'}`}>1. Liens Portail</button>
+                <button onClick={() => setActiveTab('credentials')} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'credentials' ? 'bg-[#fe2c55] text-white' : 'text-neutral-500'}`}>2. Lancer</button>
             </div>
           </div>
 
           {activeTab === 'setup' ? (
             <div className="space-y-6">
-              <div className="bg-amber-500/10 border-l-4 border-amber-500 p-4 rounded-r-xl">
-                 <p className="text-xs text-amber-200 font-medium">
-                   <strong>ACTION REQUISE :</strong> Copiez votre URL de navigateur ci-dessous pour générer vos liens TikTok.
+              <div className="bg-blue-500/10 border-l-4 border-blue-500 p-4 rounded-r-xl">
+                 <p className="text-xs text-blue-200 font-medium leading-relaxed">
+                   <strong>Vérifiez votre URL :</strong> Si les liens ci-dessous ne commencent pas par votre adresse GitHub, corrigez l'URL manuellement.
                  </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">URL actuelle du site</label>
+                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">URL Racine de votre site</label>
                 <input 
                   type="text" 
                   value={customBaseUrl}
                   onChange={(e) => setCustomBaseUrl(e.target.value)}
-                  className="w-full bg-black border border-white/10 p-4 rounded-xl font-mono text-sm focus:border-amber-500 outline-none text-white"
+                  className="w-full bg-black border border-white/10 p-4 rounded-xl font-mono text-sm focus:border-blue-500 outline-none text-white"
+                  placeholder="Ex: https://votre-nom.github.io/votre-projet/"
                 />
               </div>
 
@@ -167,21 +189,24 @@ const App: React.FC = () => {
                   <div key={i} className="group">
                     <label className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-1 block">{item.label}</label>
                     <div className="flex gap-2">
-                      <div className={`flex-1 bg-black/40 border ${item.highlight ? 'border-[#fe2c55]/30' : 'border-white/5'} p-3 rounded-lg font-mono text-[10px] truncate ${item.highlight ? 'text-[#fe2c55]' : 'text-neutral-400'}`}>{item.value}</div>
+                      <div className={`flex-1 bg-black/40 border ${item.highlight ? 'border-[#fe2c55]/30' : 'border-white/5'} p-3 rounded-lg font-mono text-[10px] truncate ${item.highlight ? 'text-[#fe2c55]' : 'text-neutral-400'}`}>
+                        {item.value}
+                      </div>
                       <button onClick={() => copyToClipboard(item.value)} className="bg-white/5 hover:bg-white/10 px-4 rounded-lg text-[10px] font-bold transition-colors">COPY</button>
                     </div>
                   </div>
                 ))}
               </div>
-              <button onClick={() => setActiveTab('credentials')} className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Suivant : Configuration API →</button>
+              <p className="text-[9px] text-neutral-600 text-center italic">Ces liens sont indispensables pour que TikTok autorise votre application.</p>
+              <button onClick={() => setActiveTab('credentials')} className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Étape suivante →</button>
             </div>
           ) : (
             <div className="space-y-6">
                <div className="space-y-2">
-                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">Client Key (TikTok Portal)</label>
+                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">TikTok Client Key</label>
                 <input 
                   type="text" 
-                  placeholder="Paste your Client Key..." 
+                  placeholder="Collez votre Client Key ici..." 
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   className="w-full bg-black border border-white/10 p-4 rounded-xl font-mono text-sm focus:border-[#fe2c55] outline-none text-white"
@@ -189,7 +214,7 @@ const App: React.FC = () => {
               </div>
 
               <div className="bg-neutral-900/50 p-6 rounded-2xl border border-white/5 space-y-4">
-                <h3 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Scopes Requis</h3>
+                <h3 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Scopes à cocher sur le portail</h3>
                 <div className="flex flex-wrap gap-2">
                   {['user.info.basic', 'live.interaction.gift', 'live.interaction.comment'].map(s => (
                     <span key={s} className="bg-black/50 px-2 py-1 rounded border border-white/5 text-[9px] font-mono text-neutral-400">{s}</span>
@@ -203,7 +228,7 @@ const App: React.FC = () => {
                   disabled={isConnecting}
                   className="w-full py-5 bg-[#fe2c55] text-white rounded-2xl font-black text-lg hover:brightness-110 transition-all active:scale-[0.98] shadow-lg disabled:opacity-50"
                 >
-                  {isConnecting ? 'CHARGEMENT...' : 'LANCER LE LIVE DASHBOARD'}
+                  {isConnecting ? 'CHARGEMENT...' : 'ACCÉDER AU DASHBOARD'}
                 </button>
                 <button onClick={() => setActiveTab('setup')} className="w-full py-2 text-neutral-500 text-[10px] font-bold uppercase tracking-widest hover:text-white">← Retour aux URLs</button>
               </div>
@@ -214,6 +239,7 @@ const App: React.FC = () => {
     );
   }
 
+  // ÉCRAN PRINCIPAL (LEADERBOARD)
   return (
     <div className="h-screen w-screen flex flex-col bg-white overflow-hidden text-black font-black uppercase border-[0.5vh] border-black relative">
       <header className="h-[8vh] flex items-center justify-between border-b-[0.5vh] border-black px-8 bg-white">
@@ -223,11 +249,11 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full border border-green-200">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-[10px] text-green-700 font-mono tracking-widest">LIVE SYNC ACTIVE</span>
+            <span className="text-[10px] text-green-700 font-mono tracking-widest uppercase">Live Sync Active</span>
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[0.8vh] text-neutral-400 font-mono">ID: {clientId.substring(0,8)}...</span>
+          <span className="text-[0.8vh] text-neutral-400 font-mono">ID: {clientId ? clientId.substring(0,8) : 'NON-DÉFINI'}</span>
           <span className="text-[1.8vh] italic">VALEUR EN TEMPS RÉEL</span>
         </div>
       </header>
@@ -236,7 +262,7 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col border-r-[0.5vh] border-black">
           <div className="h-[4vh] bg-neutral-900 text-white flex items-center px-4 justify-between">
             <span className="text-[1.2vh] italic tracking-widest">LIVE QUOTATION</span>
-            <span className="text-[1vh] font-mono">200 OK</span>
+            <span className="text-[1vh] font-mono">STATUS: ONLINE</span>
           </div>
           <div className="flex-1 grid grid-cols-3">
             {starsColumns.map((col, idx) => (
@@ -266,7 +292,7 @@ const App: React.FC = () => {
           <div className="flex-1 flex flex-col bg-black text-green-400 p-4 font-mono overflow-hidden">
             <div className="text-[10px] text-neutral-500 mb-2 flex justify-between uppercase border-b border-white/10 pb-1">
               <span>Terminal Log</span>
-              <span>Online</span>
+              <span>Waiting...</span>
             </div>
             <div className="flex-1 overflow-y-auto text-[10px] space-y-1">
               {logs.map(log => (
@@ -276,7 +302,7 @@ const App: React.FC = () => {
                   <span className="text-green-500">[{log.status}]</span>
                 </div>
               ))}
-              {logs.length === 0 && <div className="text-neutral-700">Waiting for Webhooks...</div>}
+              {logs.length === 0 && <div className="text-neutral-700">Listening for Webhooks...</div>}
             </div>
           </div>
         </div>
@@ -289,4 +315,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-

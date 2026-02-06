@@ -22,15 +22,16 @@ class AudioEngine {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       this.isInitialized = true;
     } catch (e) {
-      console.error("Web Audio non supporté");
+      console.warn("AudioEngine: Web Audio non supporté, passage en fallback natif.");
     }
   }
 
   async announce(text: string, voice: VoiceType = 'female', isUrgent = false) {
-    if (isUrgent) {
-      this.queue.unshift({ text, voice, isUrgent });
-    } else {
-      this.queue.push({ text, voice, isUrgent });
+    this.queue.push({ text, voice, isUrgent });
+    if (isUrgent && this.isSpeaking) {
+      // Priorité aux dons
+      const current = this.queue.pop()!;
+      this.queue.unshift(current);
     }
     if (!this.isSpeaking) this.processQueue();
   }
@@ -45,21 +46,16 @@ class AudioEngine {
     const announcement = this.queue.shift()!;
     const { text, voice } = announcement;
 
-    // Récupération sécurisée de la clé API
-    let apiKey = null;
-    try {
-      apiKey = process.env.API_KEY;
-    } catch (e) {
-      apiKey = null;
-    }
-
-    if (!apiKey) {
+    // Following Google GenAI guidelines: Use process.env.API_KEY directly.
+    // Assume this variable is pre-configured and accessible in the execution context.
+    if (!process.env.API_KEY) {
       this.useNativeFallback(text);
       return;
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      // Create a new instance right before use to ensure it uses the latest env state.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const selectedVoice = voice === 'female' ? 'Kore' : 'Fenrir';
       
       const response = await ai.models.generateContent({
@@ -86,6 +82,7 @@ class AudioEngine {
         this.useNativeFallback(text);
       }
     } catch (e) {
+      console.error("AudioEngine Premium Error:", e);
       this.useNativeFallback(text);
     }
   }
@@ -95,12 +92,16 @@ class AudioEngine {
         this.isSpeaking = false;
         return;
     }
+    // On annule les voix en cours pour éviter les chevauchements sur les dons
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR';
+    utterance.rate = 1.1;
     utterance.onend = () => this.processQueue();
     window.speechSynthesis.speak(utterance);
   }
 
+  // Manual base64 decoding as per guidelines to avoid external library dependencies.
   private decodeBase64(base64: string) {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
@@ -108,6 +109,7 @@ class AudioEngine {
     return bytes;
   }
 
+  // Raw PCM decoding as per Gemini API documentation for TTS responses.
   private async decodePcm(data: Uint8Array): Promise<AudioBuffer> {
     const dataInt16 = new Int16Array(data.buffer);
     const buffer = this.ctx!.createBuffer(1, dataInt16.length, 24000);

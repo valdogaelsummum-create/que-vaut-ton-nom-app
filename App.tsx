@@ -23,10 +23,14 @@ const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [logs, setLogs] = useState<WebhookLog[]>([]);
   const [activeTab, setActiveTab] = useState<'setup' | 'credentials'>('setup');
+  const [initError, setInitError] = useState<string | null>(null);
   
-  const [clientId, setClientId] = useState(() => localStorage.getItem('tiktok_client_id') || '');
+  const [clientId, setClientId] = useState(() => {
+    try {
+      return localStorage.getItem('tiktok_client_id') || '';
+    } catch { return ''; }
+  });
   
-  // Calcul automatique de l'URL pour les liens
   const baseUrl = useMemo(() => {
     const loc = window.location;
     let path = loc.pathname;
@@ -40,26 +44,34 @@ const App: React.FC = () => {
       const loadedUsers = storageService.getUsers();
       setUsers(loadedUsers);
     } catch (e) {
-      console.error("Erreur d'initialisation du stockage:", e);
-      setUsers([]);
+      console.error("Storage Error:", e);
+      setInitError("Erreur lors du chargement des données locales.");
     }
   }, []);
 
   const rankings = useMemo(() => {
-    const sorted = [...users].filter(u => u.pointsLive > 0).sort((a, b) => b.pointsLive - a.pointsLive);
-    return { topLive: sorted.slice(0, 15) };
+    try {
+      const sorted = [...users].filter(u => u.pointsLive > 0).sort((a, b) => b.pointsLive - a.pointsLive);
+      return { topLive: sorted.slice(0, 15) };
+    } catch {
+      return { topLive: [] };
+    }
   }, [users]);
 
   const countryRankings = useMemo<CountryRanking[]>(() => {
-    const scores: Record<string, number> = {};
-    users.forEach(u => {
-      if (u.countryCode && u.pointsLive > 0) {
-        scores[u.countryCode] = (scores[u.countryCode] || 0) + u.pointsLive;
-      }
-    });
-    return Object.entries(scores)
-      .map(([countryCode, points]) => ({ countryCode, points }))
-      .sort((a, b) => b.points - a.points);
+    try {
+      const scores: Record<string, number> = {};
+      users.forEach(u => {
+        if (u.countryCode && u.pointsLive > 0) {
+          scores[u.countryCode] = (scores[u.countryCode] || 0) + u.pointsLive;
+        }
+      });
+      return Object.entries(scores)
+        .map(([countryCode, points]) => ({ countryCode, points }))
+        .sort((a, b) => b.points - a.points);
+    } catch {
+      return [];
+    }
   }, [users]);
 
   const addLog = (type: string, payload: any) => {
@@ -81,30 +93,42 @@ const App: React.FC = () => {
   const handleTikTokAuth = () => {
     if (!clientId) return alert("Veuillez entrer votre Client ID");
     setIsConnecting(true);
-    localStorage.setItem('tiktok_client_id', clientId);
+    try {
+      localStorage.setItem('tiktok_client_id', clientId);
+    } catch {}
     setTimeout(() => {
       setIsConnecting(false);
       handleStart();
     }, 500);
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => alert("Copié !"));
-  };
-
   const handleEvent = (event: LiveEvent) => {
-    if (event.type === 'gift') {
-      const updated = storageService.updateUser(event.username, event.username, event.coins);
-      setUsers(updated);
-      setLastGift({ username: event.username, giftName: event.giftName, coins: event.coins });
-      addLog('gift', { user: event.username, coins: event.coins });
-      audioEngine.announce(`${event.username} vient de booster sa cote de ${event.coins} points !`, 'female', true);
-    } else if (event.type === 'comment') {
-      const updated = storageService.setCountry(event.username, event.comment);
-      setUsers(updated);
-      addLog('country', { user: event.username, code: event.comment });
+    try {
+      if (event.type === 'gift') {
+        const updated = storageService.updateUser(event.username, event.username, event.coins);
+        setUsers(updated);
+        setLastGift({ username: event.username, giftName: event.giftName, coins: event.coins });
+        addLog('gift', { user: event.username, coins: event.coins });
+        audioEngine.announce(`${event.username} vient de booster son nom de ${event.coins} points !`, 'female', true);
+      } else if (event.type === 'comment') {
+        const updated = storageService.setCountry(event.username, event.comment);
+        setUsers(updated);
+        addLog('country', { user: event.username, code: event.comment });
+      }
+    } catch (e) {
+      console.error("Event Handling Error:", e);
     }
   };
+
+  if (initError) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-10 text-red-500 font-mono">
+        <h1 className="text-2xl font-bold mb-4">CRITICAL ERROR</h1>
+        <p>{initError}</p>
+        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="mt-6 px-4 py-2 bg-red-500 text-white rounded">Vider le cache et redémarrer</button>
+      </div>
+    );
+  }
 
   const starsColumns = useMemo(() => {
     const cols: any[][] = [[], [], []];
@@ -129,7 +153,7 @@ const App: React.FC = () => {
 
           {activeTab === 'setup' ? (
             <div className="space-y-4">
-              <p className="text-xs text-neutral-400">Copiez ces URLs dans votre portail TikTok Developer :</p>
+              <p className="text-xs text-neutral-400">URLs pour TikTok Developer Portal :</p>
               {[
                 { label: "Redirect URI", val: baseUrl },
                 { label: "Privacy Policy", val: baseUrl + 'privacy.html' },
@@ -140,7 +164,7 @@ const App: React.FC = () => {
                   <label className="text-[9px] text-neutral-500 font-bold uppercase">{item.label}</label>
                   <div className="flex gap-2">
                     <input readOnly value={item.val} className="flex-1 bg-black border border-white/5 p-2 rounded text-[10px] font-mono text-neutral-300" />
-                    <button onClick={() => copyToClipboard(item.val)} className="bg-white/5 px-3 rounded text-[9px] font-bold">COPY</button>
+                    <button onClick={() => { navigator.clipboard.writeText(item.val); alert("Copié !"); }} className="bg-white/5 px-3 rounded text-[9px] font-bold">COPY</button>
                   </div>
                 </div>
               ))}
@@ -176,7 +200,7 @@ const App: React.FC = () => {
            <span className="text-[3vh] block skew-x-[10deg]">QUE VAUT TON NOM ?</span>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[10px] text-neutral-400 font-mono">LIVE SYNC ACTIVE</span>
+          <span className="text-[10px] text-neutral-400 font-mono tracking-widest">LIVE SYNC ACTIVE</span>
           <span className="text-[1.5vh] italic">VALEUR EN TEMPS RÉEL</span>
         </div>
       </header>
@@ -185,7 +209,7 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col border-r-[4px] border-black">
           <div className="h-[4vh] bg-neutral-900 text-white flex items-center px-4 justify-between">
             <span className="text-[1.2vh] italic">LIVE QUOTATION</span>
-            <span className="text-[1vh] font-mono">200 OK</span>
+            <span className="text-[1vh] font-mono tracking-tighter">API STATUS: ONLINE</span>
           </div>
           <div className="flex-1 grid grid-cols-3">
             {starsColumns.map((col, idx) => (
@@ -221,14 +245,14 @@ const App: React.FC = () => {
                   <span className="text-blue-400">{log.type}</span>
                 </div>
               ))}
-              {logs.length === 0 && <div className="text-neutral-700">Waiting for data...</div>}
+              {logs.length === 0 && <div className="text-neutral-700 italic">Waiting for incoming data...</div>}
             </div>
           </div>
         </div>
       </div>
 
       <GiftOverlay gift={lastGift} />
-      <Simulator onEvent={handleEvent} onReset={() => setUsers([])} users={users} />
+      <Simulator onEvent={handleEvent} onReset={() => { storageService.resetLivePoints(); setUsers([]); }} users={users} />
     </div>
   );
 };

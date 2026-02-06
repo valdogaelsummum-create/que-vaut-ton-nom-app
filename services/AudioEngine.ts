@@ -95,14 +95,17 @@ class AudioEngine {
     const announcement = this.queue.shift()!;
     const { text, voice } = announcement;
 
-    if (!process.env.API_KEY) {
+    // Check safely for process.env
+    const apiKey = typeof process !== 'undefined' ? process.env?.API_KEY : null;
+
+    if (!apiKey) {
       this.useNativeFallback(text, voice);
       return;
     }
 
     try {
       await this.ctx.resume();
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const selectedVoice = voice === 'female' ? 'Kore' : 'Fenrir';
       
       const baseInstruction = `
@@ -145,11 +148,16 @@ class AudioEngine {
         throw new Error("No audio");
       }
     } catch (e) {
+      console.error("AudioEngine Error:", e);
       this.useNativeFallback(text, voice);
     }
   }
 
   private useNativeFallback(text: string, voice: VoiceType) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+        this.processQueue();
+        return;
+    }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR';

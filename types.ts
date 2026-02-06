@@ -17,12 +17,6 @@ export interface CountryRanking {
   points: number;
 }
 
-export interface Gift {
-  username: string;
-  amount: number;
-  timestamp: number;
-}
-
 export interface GiftEvent {
   username: string;
   giftName: string;
